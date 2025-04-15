@@ -1,7 +1,3 @@
 python-telegram-bot==20.7
-openai
+exchangelib
 python-dotenv
-pytesseract
-pymupdf
-docx2txt
-pillow
