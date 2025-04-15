@@ -1,0 +1,1 @@
+worker: python telegram_ai_jurist_bot.py
