@@ -1,3 +1,4 @@
 python-telegram-bot[webhooks]
 exchangelib
 python-dotenv
+flask
