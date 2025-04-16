@@ -1,1 +1,1 @@
- pweb: python3 webhook_bot.py
+web: python3 webhook_bot.py
