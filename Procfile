@@ -1,1 +1,1 @@
-worker: python telegram_ai_jurist_bot.py
+ pweb: python3 webhook_bot.py
