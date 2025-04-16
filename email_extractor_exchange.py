@@ -1,20 +1,27 @@
+from exchangelib import Credentials, Account, DELEGATE, Configuration
 import os
-from exchangelib import Credentials, Account, Configuration, DELEGATE
-from exchangelib.protocol import BaseProtocol, NoVerifyHTTPAdapter
-from datetime import datetime, timedelta
-from dotenv import load_dotenv
 
-load_dotenv()
-EMAIL = os.getenv("EMAIL")
-PASSWORD = os.getenv("EMAIL_PASSWORD")
-EXCHANGE_SERVER = os.getenv("EXCHANGE_SERVER")
+def connect_to_exchange():
+    email = os.getenv("EXCHANGE_EMAIL")
+    password = os.getenv("EXCHANGE_PASSWORD")
+    if not email or not password:
+        raise ValueError("EXCHANGE_EMAIL або EXCHANGE_PASSWORD не задані")
 
-BaseProtocol.HTTP_ADAPTER_CLS = NoVerifyHTTPAdapter
+    creds = Credentials(email, password)
+    config = Configuration(server='outlook.office365.com', credentials=creds)
+    account = Account(primary_smtp_address=email, credentials=creds, autodiscover=False, config=config, access_type=DELEGATE)
+    return account
 
-def connect():
-    creds = Credentials(username=EMAIL, password=PASSWORD)
-    config = Configuration(server=EXCHANGE_SERVER, credentials=creds)
-    return Account(primary_smtp_address=EMAIL, config=config, autodiscover=False, access_type=DELEGATE)
+def fetch_emails(account, max_items=5):
+    inbox = account.inbox
+    messages = inbox.all().order_by('-datetime_received')[:max_items]
+    results = []
 
-if __name__ == "__main__":
-    print("🔐 Exchange модуль готовий.")
+    for msg in messages:
+        subject = msg.subject
+        sender = msg.sender.email_address if msg.sender else "невідомо"
+        body_preview = msg.text_body[:200] if msg.text_body else "немає тексту"
+        print(f"[📩] {subject} — {sender}")
+        results.append((subject, sender, body_preview))
+
+    return results
