@@ -1,1 +1,0 @@
-# OCR logic goes here
