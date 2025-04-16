@@ -1,4 +1,0 @@
-python-telegram-bot[webhooks]==20.6
-exchangelib
-python-dotenv
-flask
