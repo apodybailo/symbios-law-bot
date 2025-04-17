@@ -1,90 +1,76 @@
-
 import os
-import logging
 import json
+import logging
 from datetime import datetime
-from telegram import Update, Document
-from telegram.ext import (
-    ApplicationBuilder,
-    CommandHandler,
-    MessageHandler,
-    ContextTypes,
-    filters
-)
-from ocr_parser import extract_text_from_file
 from openai import OpenAI
 
-BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
-AUTHORIZED_USER_ID = int(os.getenv("AUTHORIZED_USER_ID", "0"))
+# 🔐 Ключ API
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")
-PORT = int(os.getenv("PORT", "10000"))
-
 client = OpenAI(api_key=OPENAI_API_KEY)
-MEMORY_FILE = "memory.jsonl"
 
+# 📁 Файл для збереження памʼяті
+MEMORY_FILE = "memory.json"
+
+# 🔊 Логування
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("symbios-law-gpt-memory")
+logger = logging.getLogger("symbios-law-memory")
 
-def remember(text, reply, source="telegram", tags=None):
+# 🧠 Збереження відповіді в памʼять
+def remember(query: str, reply: str, source="telegram", tags=None):
     entry = {
-        "date": datetime.now().isoformat(),
-        "user_id": AUTHORIZED_USER_ID,
-        "type": "document",
+        "timestamp": datetime.now().isoformat(),
+        "query": query,
+        "reply": reply,
         "source": source,
-        "text": text,
-        "gpt_reply": reply,
         "tags": tags or []
     }
-    with open(MEMORY_FILE, "a", encoding="utf-8") as f:
-        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
 
-def load_memory(limit=5, tag_filter=None):
     if not os.path.exists(MEMORY_FILE):
-        return []
-    with open(MEMORY_FILE, encoding="utf-8") as f:
-        lines = f.readlines()
-    entries = [json.loads(line) for line in lines]
-    if tag_filter:
-        entries = [e for e in entries if tag_filter in e.get("tags", [])]
-    return entries[-limit:]
+        with open(MEMORY_FILE, "w") as f:
+            json.dump([], f)
 
-async def analyze(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.effective_user.id != AUTHORIZED_USER_ID:
-        return
+    with open(MEMORY_FILE, "r") as f:
+        data = json.load(f)
 
-    doc = update.message.document
-    file = await doc.get_file()
-    file_path = await file.download_to_drive()
-    text = extract_text_from_file(file_path)
+    data.append(entry)
 
-    memory_context = load_memory(limit=3)
-    mem_text = "\n\n".join([f"- {m['text'][:300]}" for m in memory_context])
+    with open(MEMORY_FILE, "w") as f:
+        json.dump(data, f, indent=2)
 
-    prompt = f"Контекст попередніх документів:\n{mem_text}\n\nНовий документ:\n{text}"
+# 🔎 Пошук в памʼяті (опційно)
+def memory_lookup(query: str):
+    if not os.path.exists(MEMORY_FILE):
+        return ""
 
-    await update.message.reply_text("🧠 GPT аналізує документ з урахуванням памʼяті...")
+    with open(MEMORY_FILE, "r") as f:
+        data = json.load(f)
 
+    # Пошук останнього схожого запиту (простий фільтр)
+    for item in reversed(data):
+        if query.lower() in item["query"].lower():
+            return item["reply"]
+
+    return ""
+
+# 🤖 Генерація GPT-відповіді + запис у памʼять
+def generate_gpt_with_memory(user_input: str, context: str = "") -> str:
     try:
+        prompt = f"Аналізуй юридичний документ:\nКонтекст: {context}\nЗапит: {user_input}"
+
         response = client.chat.completions.create(
-            model="gpt-4",
-            messages=[{"role": "user", "content": prompt}]
+            model="gpt-3.5-turbo",
+            messages=[
+                {"role": "system", "content": "Ти юридичний аналітик. Відповідай чітко й структуровано."},
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.3,
+            max_tokens=800
         )
-        reply = response.choices[0].message.content
-        remember(text, reply)
-        await update.message.reply_text(f"📄 GPT-відповідь:
-{reply[:4000]}")
+
+        reply = response.choices[0].message.content.strip()
+        remember(user_input, reply)
+        return reply
+
     except Exception as e:
-        await update.message.reply_text(f"❌ Помилка GPT: {e}")
-
-async def context(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    entries = load_memory()
-    output = "\n---\n".join([f"{e['date']}\n{e['gpt_reply'][:300]}" for e in entries])
-    await update.message.reply_text(f"🧠 Останні GPT-взаємодії:\n{output[:4000]}")
-
-if __name__ == "__main__":
-    logger.info("🚀 SYMBIOS GPT з памʼяттю — запуск")
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
-    app.add_handler(CommandHandler("context", context))
-    app.add_handler(MessageHandler(filters.Document.ALL, analyze))
-    app.run_webhook(listen="0.0.0.0", port=PORT, webhook_url=WEBHOOK_URL)
+        logger.error(f"❌ GPT error: {e}")
+        return "GPT не відповів через помилку."
