@@ -4,3 +4,4 @@ exchangelib
 pytesseract
 pdf2image
 Pillow
+openai
