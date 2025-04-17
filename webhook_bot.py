@@ -52,6 +52,7 @@ def main():
     app.add_handler(CommandHandler("start", start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
 
+    PORT = int(os.environ.get("PORT", 8080))
     app.run_webhook(
         listen="0.0.0.0",
         port=8080,
