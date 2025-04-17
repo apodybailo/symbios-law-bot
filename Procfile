@@ -1,1 +1,1 @@
-web: python3 webhook_bot.py
+web: gunicorn webhook_flask_bot:flask_app
