@@ -8,3 +8,5 @@ openai
 gunicorn
 fastapi
 uvicorn
+PyMuPDF
+docx2txt
