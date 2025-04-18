@@ -7,6 +7,6 @@ Pillow
 openai
 gunicorn
 fastapi
-uvicorn
 PyMuPDF
 docx2txt
+uvicorn[standard]
